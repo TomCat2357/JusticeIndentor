@@ -11,70 +11,71 @@ const FIELDS = {
   mode: {
     default: 'move',
     options: [
-      { key: 'move',  text: '○字ずらす（今の位置から）' },
-      { key: 'set',   text: '左端から○字にする' },
-      { key: 'reset', text: 'インデントを解除' },
-      { key: 'none',  text: 'インデントは変えない（整形のみ）' },
+      { key: 'move',  text: '↔️ ずらす' },
+      { key: 'set',   text: '📏 左端から' },
+      { key: 'reset', text: '↩️ 解除' },
+      { key: 'none',  text: '✨ 整形のみ' },
     ],
   },
   move_target: {
     default: 'all',
     options: [
-      { key: 'all',       text: '全体' },
-      { key: 'first',     text: '1行目のみ' },
-      { key: 'following', text: '2行目以降のみ' },
-      { key: 'right',     text: '右端（右インデント）' },
+      { key: 'all',       text: '▤ 全体' },
+      { key: 'first',     text: '1️⃣ 1行目' },
+      { key: 'following', text: '2️⃣ 2行目〜' },
+      { key: 'right',     text: '➡️ 右端' },
     ],
   },
-  move_amount: { default: '1', required: true },
+  // 文字数はドロップダウンで選ぶ（最大5字）
+  move_amount: { default: '1', dropdown: true, options: [{ key: '0.5', text: '0.5字' }, { key: '1', text: '1字' }, { key: '2', text: '2字' }, { key: '3', text: '3字' }, { key: '4', text: '4字' }, { key: '5', text: '5字' }] },
   set_target: {
     default: 'all',
     options: [
-      { key: 'all',       text: '全体' },
-      { key: 'first',     text: '1行目のみ' },
-      { key: 'following', text: '2行目以降のみ' },
-      { key: 'right',     text: '右端（右インデント）' },
+      { key: 'all',       text: '▤ 全体' },
+      { key: 'first',     text: '1️⃣ 1行目' },
+      { key: 'following', text: '2️⃣ 2行目〜' },
+      { key: 'right',     text: '➡️ 右端' },
     ],
   },
-  position: { default: '0', required: true },
+  position: { default: '0', dropdown: true, options: [{ key: '0', text: '0字' }, { key: '0.5', text: '0.5字' }, { key: '1', text: '1字' }, { key: '2', text: '2字' }, { key: '3', text: '3字' }, { key: '4', text: '4字' }, { key: '5', text: '5字' }] },
   shape: {
     default: 'flush',
     options: [
-      { key: 'flush',   text: '揃える' },
-      { key: 'indent',  text: '字下げ（1行目だけ右へ）' },
-      { key: 'hanging', text: 'ぶら下げ（2行目以降を右へ）' },
+      { key: 'flush',   text: '≡ 揃える' },
+      { key: 'indent',  text: '⇥ 字下げ' },
+      { key: 'hanging', text: '⇤ ぶら下げ' },
     ],
   },
-  shape_amount: { default: '1', required: true },
   shape_base: {
     default: 'following',
     options: [
-      { key: 'following', text: '2行目以降を指定位置に置く' },
-      { key: 'first',     text: '1行目を指定位置に置く' },
+      { key: 'following', text: '2️⃣ を基準' },
+      { key: 'first',     text: '1️⃣ を基準' },
     ],
   },
   space_chars: {
     default: 'none',
     options: [
-      { key: 'none',    text: '削除しない' },
-      { key: 'leading', text: '段落先頭の空白を削除' },
-      { key: 'trim',    text: '段落の先頭と末尾の空白を削除' },
-      { key: 'all',     text: '段落内のすべての空白を削除' },
-      { key: 'all_but_label', text: '番号の後ろを除き、すべての空白を削除' },
+      { key: 'none',    text: '🚫 しない' },
+      { key: 'leading', text: '⬅️ 先頭' },
+      { key: 'trim',    text: '↔️ 前後' },
+      { key: 'all',     text: '🧹 全部' },
+      { key: 'all_but_label', text: '①␣ 番号後は残す' },
     ],
   },
   para_spacing: {
     default: 'keep',
     options: [
-      { key: 'keep',   text: '変更しない' },
-      { key: 'zero',   text: '前後とも 0 にする（詰める）' },
-      { key: 'custom', text: '値を指定する' },
+      { key: 'keep',   text: '🚫 そのまま' },
+      { key: 'zero',   text: '⏬ 0に' },
+      { key: 'custom', text: '✏️ 指定' },
     ],
   },
   spacing_before: { default: '' },
   spacing_after:  { default: '' },
-  preview:        { default: '' }, // 'on' のときプレビューを表示
 };
+
+const SHAPE_CHARS = 1; // 字下げ・ぶら下げの量（文字）
 
 const LIMITS = {
   MAX_CHARS: 100,      // インデント量の上限（文字）
@@ -102,12 +103,29 @@ function onDocsHomepage(e) {
 }
 
 /**
- * ドロップダウンが変わったとき：
- * 設定を保存し、関係する入力欄だけを表示し直す（＝無関係な項目を出さない）
+ * 入力欄・スイッチが変わったとき：設定を保存して表示し直す
  */
 function onSettingsChange(e) {
   const s = resolveSettings_(e);
   saveSettings_(s);
+  return rerender_(s);
+}
+
+/**
+ * 選択肢のボタンを押したとき：その値を選んだ状態にして表示し直す
+ * （関係する項目だけを出し直す＝無関係な項目は出さない）
+ */
+function onChoose(e) {
+  const s = resolveSettings_(e);
+  const field = e && e.parameters && e.parameters.field;
+  const value = e && e.parameters && e.parameters.value;
+  const options = FIELDS[field] && FIELDS[field].options;
+  if (options && options.some(o => o.key === value)) s[field] = value;
+  saveSettings_(s);
+  return rerender_(s);
+}
+
+function rerender_(s) {
   return CardService.newActionResponseBuilder()
     .setNavigation(CardService.newNavigation().updateCard(buildCard_(s)))
     .build();
@@ -135,36 +153,15 @@ function runAction(e) {
   }
 }
 
-/** 選択中（先頭）の段落の現在値を表示 */
-function showCurrentValues(e) {
+/**
+ * 🔄 現在値：選択中の段落を読み直してプレビューを描き直す。
+ * 通知（下に出る黒い帯）はパネルを隠すので出さず、値はプレビューに表示する。
+ */
+function refreshCurrent(e) {
   try {
-    const doc = getDocument_();
-    const paragraphs = getTargetParagraphs_(doc);
-    if (paragraphs.length === 0) return notify_(MSG.NO_TARGET);
-
-    const p = paragraphs[0];
-    const em = getCharWidth_(p, createContext_(doc));
-    const start = num_(p.getIndentStart());
-    const first = num_(p.getIndentFirstLine());
-    const end   = num_(p.getIndentEnd());
-    const ch = v => formatNumber_(v / em) + '字';
-    const pt = v => (v === null || v === undefined) ? '既定' : formatNumber_(v) + 'pt';
-
-    let shape = 'そろえ';
-    if (first - start > 0.01) shape = '字下げ' + ch(first - start);
-    else if (start - first > 0.01) shape = 'ぶら下げ' + ch(start - first);
-
-    const msg =
-      (paragraphs.length > 1 ? '【先頭の段落】' : '') +
-      '1行目 ' + ch(first) + '・2行目以降 ' + ch(start) + '（' + shape + '）／右 ' + ch(end) +
-      '／段落前 ' + pt(p.getSpacingBefore()) + '・段落後 ' + pt(p.getSpacingAfter()) +
-      '（1字=' + formatNumber_(em) + 'pt）';
-    // プレビュー表示中なら、図も選択中の段落で描き直す
     const s = resolveSettings_(e);
-    const res = CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText(msg));
-    if (s.preview === 'on') res.setNavigation(CardService.newNavigation().updateCard(buildCard_(s)));
-    return res.build();
+    saveSettings_(s);
+    return rerender_(s);
   } catch (err) {
     return handleException_(err);
   }
@@ -183,7 +180,15 @@ function readCurrentState_() {
     const p = paragraphs[0];
     const em = getCharWidth_(p, createContext_(doc));
     const ch = v => Math.round(num_(v) / em * 10) / 10;
-    return { first: ch(p.getIndentFirstLine()), start: ch(p.getIndentStart()), end: ch(p.getIndentEnd()) };
+    return {
+      first: ch(p.getIndentFirstLine()),
+      start: ch(p.getIndentStart()),
+      end:   ch(p.getIndentEnd()),
+      before: p.getSpacingBefore(), // pt（null＝スタイルの既定）
+      after:  p.getSpacingAfter(),
+      em: em,                       // 1字の大きさ（pt）
+      multiple: paragraphs.length > 1,
+    };
   } catch (err) {
     return null;
   }
@@ -220,8 +225,6 @@ function resolveSettings_(e) {
   const saved = loadSavedSettings_();
   Object.keys(FIELDS).forEach(key => {
     s[key] = (key in saved) ? String(saved[key]) : FIELDS[key].default;
-    // 必須の数値欄が空のまま保存されていたら既定値に戻す（開いた直後から空欄にならないように）
-    if (FIELDS[key].required && s[key].trim() === '') s[key] = FIELDS[key].default;
   });
 
   const input = (e && e.formInput) || {};
@@ -244,16 +247,10 @@ function resolveSettings_(e) {
   return s;
 }
 
-/** 現在の設定で表示される「空にできる」入力欄（テキスト入力・スイッチ）の一覧 */
+/** 現在の設定で表示される「空にできる」入力欄（テキスト入力）の一覧 */
 function renderedTextFields_(s) {
   const fields = [];
-  if (s.mode === 'move') fields.push('move_amount');
-  if (s.mode === 'set') {
-    fields.push('position');
-    if (s.set_target === 'all' && s.shape !== 'flush') fields.push('shape_amount');
-  }
   if (s.para_spacing === 'custom') fields.push('spacing_before', 'spacing_after');
-  fields.push('preview'); // スイッチはオフのときフォームに値が入らないため常に記録する
   return fields;
 }
 
@@ -269,95 +266,157 @@ function buildCard_(s) {
   const run = params => CardService.newAction()
     .setFunctionName('runAction')
     .setParameters(Object.assign({ rendered: rendered }, params || {}));
-  // プレビュー表示中だけ、数値の入力や図に関わる項目の変更でも再描画する
-  const live = s.preview === 'on';
-  const liveChange = () => (live ? onChange() : null);
+  const choices = (field, labelOverrides) => choiceRow_(field, s[field], rendered, labelOverrides);
+
   const card = CardService.newCardBuilder();
 
+  // ---- 実行ボタン（一番上） ----
+  const actions = CardService.newCardSection();
+  const runButtons = CardService.newButtonSet();
+  if (s.mode === 'move') {
+    const isRight = s.move_target === 'right';
+    runButtons
+      .addButton(filledButton_(isRight ? '◀ 右端' : '◀', run({ direction: 'left' })))
+      .addButton(filledButton_(isRight ? '右端 ▶' : '▶', run({ direction: 'right' })));
+  } else {
+    const label = { set: '✔️ 設定', reset: '↩️ 解除', none: '✨ 整形' }[s.mode];
+    runButtons.addButton(filledButton_(label, run()));
+  }
+  runButtons.addButton(CardService.newTextButton()
+    .setText('🔄 現在値')
+    .setOnClickAction(CardService.newAction()
+      .setFunctionName('refreshCurrent')
+      .setParameters({ rendered: rendered })));
+  actions.addWidget(runButtons);
+
   // ---- インデント ----
-  const indent = CardService.newCardSection().setHeader('インデント');
-  // 「左端から○字」で対象が右端のときは、選択肢の名前も「右端から○字」にする
-  const modeLabels = (s.mode === 'set' && s.set_target === 'right') ? { set: '右端から○字にする' } : null;
-  indent.addWidget(dropdown_('mode', '操作', s.mode, onChange(), modeLabels));
+  const indent = CardService.newCardSection().addWidget(sectionHeading_('📐 インデント'));
+  // 「左端から」で対象が右端のときは、ボタン名も「右端から」にする
+  indent.addWidget(rowLabel_('🛠 操作'));
+  indent.addWidget(choices('mode',
+    (s.mode === 'set' && s.set_target === 'right') ? { set: '📏 右端から' } : null));
+  // 区切りの考え方：
+  //   大きな区切り（インデント／整形／プレビュー）＝欄の境目（端から端までの線＋見出し）
+  //   小さな区切り（どれか1つを選ぶボタンのまとまりごと）＝欄の中の細い線
+  indent.addWidget(CardService.newDivider());
 
   switch (s.mode) {
     case 'move':
-      indent.addWidget(dropdown_('move_target', '対象', s.move_target, onChange()));
-      indent.addWidget(textInput_('move_amount', '文字数', s.move_amount,
-        '0.5文字単位も可。1文字＝その段落の文字サイズ', liveChange()));
+      indent.addWidget(rowLabel_('🎯 対象'));
+      indent.addWidget(choices('move_target'));
+      indent.addWidget(numberDropdown_('move_amount', '🔢 文字数', s.move_amount, onChange()));
       break;
 
     case 'set':
-      indent.addWidget(dropdown_('set_target', '対象', s.set_target, onChange()));
-      indent.addWidget(textInput_('position', positionTitle_(s), s.position, positionHint_(s), liveChange()));
+      indent.addWidget(rowLabel_('🎯 対象'));
+      indent.addWidget(choices('set_target'));
+      indent.addWidget(numberDropdown_('position', positionTitle_(s), s.position, onChange()));
       if (s.set_target === 'all') {
-        indent.addWidget(dropdown_('shape', '1行目の形', s.shape, onChange()));
+        indent.addWidget(CardService.newDivider());
+        indent.addWidget(rowLabel_('📐 1行目の形'));
+        indent.addWidget(choices('shape'));
         if (s.shape !== 'flush') {
-          const label = s.shape === 'indent' ? '字下げ量' : 'ぶら下げ量';
-          indent.addWidget(textInput_('shape_amount', label + '（文字数）',
-            s.shape_amount || FIELDS.shape_amount.default, // 空欄のときは既定の 1 を表示
-            '1行目と2行目以降の差', liveChange()));
-          indent.addWidget(dropdown_('shape_base', '位置の基準', s.shape_base, liveChange()));
+          indent.addWidget(CardService.newDivider());
+          indent.addWidget(rowLabel_('📍 位置の基準'));
+          indent.addWidget(choices('shape_base'));
         }
       }
       break;
 
     case 'reset':
-      indent.addWidget(CardService.newTextParagraph()
-        .setText('選択した段落の左・1行目・右のインデントをすべて 0 にします。'));
+      indent.addWidget(CardService.newTextParagraph().setText('↩️ 左・1行目・右 → 0'));
       break;
 
     case 'none':
-      indent.addWidget(CardService.newTextParagraph()
-        .setText('インデントは変更せず、下の「整形」だけを実行します。'));
+      indent.addWidget(CardService.newTextParagraph().setText('✨ 整形だけ実行'));
       break;
   }
-  card.addSection(indent);
 
   // ---- 整形（インデント操作と同時に実行） ----
-  const format = CardService.newCardSection().setHeader('同時に行う整形');
-  format.addWidget(dropdown_('space_chars', '文字の空白', s.space_chars, liveChange()));
-  format.addWidget(dropdown_('para_spacing', '段落の前後の間隔', s.para_spacing, onChange()));
+  const format = CardService.newCardSection().addWidget(sectionHeading_('🧽 整形'));
+  format.addWidget(rowLabel_('␣ 空白の削除'));
+  format.addWidget(choices('space_chars'));
+  format.addWidget(CardService.newDivider()); // 空白の削除 ／ 段落の前後の間隔 の区切り
+  format.addWidget(rowLabel_('↕️ 段落の前後の間隔'));
+  format.addWidget(choices('para_spacing'));
   if (s.para_spacing === 'custom') {
-    format.addWidget(textInput_('spacing_before', '段落前（pt）', s.spacing_before, '空欄なら変更しません', liveChange()));
-    format.addWidget(textInput_('spacing_after',  '段落後（pt）', s.spacing_after,  '空欄なら変更しません', liveChange()));
+    format.addWidget(textInput_('spacing_before', '⬆️ 段落前 pt', s.spacing_before,
+      '空欄＝そのまま', onChange()));
+    format.addWidget(textInput_('spacing_after',  '⬇️ 段落後 pt', s.spacing_after,
+      '空欄＝そのまま', onChange()));
   }
-  card.addSection(format);
 
-  // ---- プレビュー（スイッチで表示／非表示） ----
-  card.addSection(buildPreviewSection_(s, onChange()));
-
-  // ---- 実行ボタン ----
-  const actions = CardService.newCardSection();
-  if (s.mode === 'move') {
-    const isRight = s.move_target === 'right';
-    actions.addWidget(CardService.newButtonSet()
-      .addButton(filledButton_(isRight ? '◀ 右端を左へ' : '◀ 左へ', run({ direction: 'left' })))
-      .addButton(filledButton_(isRight ? '右端を右へ ▶' : '右へ ▶', run({ direction: 'right' }))));
-  } else {
-    const label = { set: '設定する', reset: 'インデントを解除', none: '整形を実行' }[s.mode];
-    actions.addWidget(filledButton_(label, run()));
-  }
-  actions.addWidget(CardService.newTextButton()
-    .setText('選択中の段落の現在値を確認')
-    .setOnClickAction(CardService.newAction()
-      .setFunctionName('showCurrentValues')
-      .setParameters({ rendered: rendered })));
+  // 並び順：実行ボタンを一番上に
   card.addSection(actions);
-
-  // ---- ヘルプ（折りたたみ） ----
+  card.addSection(indent);
+  card.addSection(format);
+  card.addSection(buildDisplaySection_(s));
   card.addSection(buildHelpSection_());
 
   return card.build();
+}
+
+/** 選択中のボタンの色（実行ボタンの青と区別する） */
+const CHOICE_SELECTED_COLOR = '#455a64';
+
+/**
+ * 選択肢をボタンの列で表示する（選択中は塗りつぶし）。
+ * 幅に収まらないときはカード側で自動的に2行に折り返す。
+ */
+function choiceRow_(field, current, rendered, labelOverrides) {
+  const row = CardService.newButtonSet();
+  FIELDS[field].options.forEach(o => {
+    const btn = CardService.newTextButton()
+      .setText((labelOverrides && labelOverrides[o.key]) || o.text)
+      .setOnClickAction(CardService.newAction()
+        .setFunctionName('onChoose')
+        .setParameters({ rendered: rendered, field: field, value: o.key }));
+    if (o.key === current) {
+      btn.setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor(CHOICE_SELECTED_COLOR);
+    }
+    row.addButton(btn);
+  });
+  return row;
+}
+
+/** 文字数のドロップダウン（変えるとプレビューを描き直す） */
+function numberDropdown_(field, title, current, onChangeAction) {
+  const w = CardService.newSelectionInput()
+    .setFieldName(field)
+    .setTitle(title)
+    .setType(CardService.SelectionInputType.DROPDOWN)
+    .setOnChangeAction(onChangeAction);
+  FIELDS[field].options.forEach(o => w.addItem(o.text, o.key, o.key === current));
+  return w;
+}
+
+/** 大項目の見出しの色（太い縦棒と文字） */
+const HEADING_COLOR = '#6d4c41';
+
+/**
+ * 大項目の見出し：太い縦棒＋太字＋色で、小項目（グレーの小見出し）より強く見せる。
+ * カードの区切り線は太さを変えられないため、見出し側で強弱をつける。
+ */
+function sectionHeading_(text) {
+  return CardService.newTextParagraph()
+    .setText('<font color="' + HEADING_COLOR + '"><b>▌' + text + '</b></font>');
+}
+
+/** ボタン列の上に付ける小さな見出し */
+function rowLabel_(text) {
+  return CardService.newTextParagraph().setText('<font color="#5f6368">' + text + '</font>');
 }
 
 function buildHelpSection_() {
   const usage =
     '<b>使い方</b>\n' +
     '① 段落を選択（カーソルを置くだけなら、その段落が対象）\n' +
-    '② 「操作」と数値を設定\n' +
-    '③ ボタンを押す\n' +
+    '② 操作・対象などをボタンで選び、文字数を入力\n' +
+    '③ 一番上の実行ボタンを押す\n' +
+    '・文字数は 0.5〜5 字から選びます。\n' +
     '・1文字＝段落の先頭文字の文字サイズです。\n' +
+    '・字下げ・ぶら下げの量は1文字です。\n' +
     '・設定内容は次回開いたときも引き継がれます。';
   const notes =
     '<b>注意</b>\n' +
@@ -373,31 +432,8 @@ function buildHelpSection_() {
 }
 
 function positionTitle_(s) {
-  switch (s.set_target) {
-    case 'first':     return '1行目の文字数（左端から）';
-    case 'following': return '2行目以降の文字数（左端から）';
-    case 'right':     return '文字数（右端から）';
-    default:          return '文字数（左端から）';
-  }
-}
-
-function positionHint_(s) {
-  if (s.set_target === 'right') return '右インデントは右端から数えます';
-  if (s.set_target === 'all' && s.shape !== 'flush') return '「位置の基準」で選んだ行をこの位置に置きます';
-  return '0.5文字単位も可';
-}
-
-function dropdown_(name, title, current, onChangeAction, labelOverrides) {
-  const w = CardService.newSelectionInput()
-    .setFieldName(name)
-    .setTitle(title)
-    .setType(CardService.SelectionInputType.DROPDOWN);
-  FIELDS[name].options.forEach(o => {
-    const text = (labelOverrides && labelOverrides[o.key]) || o.text;
-    w.addItem(text, o.key, o.key === current);
-  });
-  if (onChangeAction) w.setOnChangeAction(onChangeAction);
-  return w;
+  return { first: '🔢 1行目（左端から）', following: '🔢 2行目〜（左端から）', right: '🔢 右端から' }[s.set_target]
+    || '🔢 左端から';
 }
 
 function textInput_(name, title, value, hint, onChangeAction) {
@@ -430,19 +466,9 @@ const PREVIEW = {
   COLOR_ERROR: '#d93025',
 };
 
-function buildPreviewSection_(s, onChangeAction) {
-  const live = s.preview === 'on';
-  const section = CardService.newCardSection().setHeader('プレビュー');
-  section.addWidget(CardService.newDecoratedText()
-    .setText('動きのイメージを表示')
-    .setBottomLabel('設定を変えるたびに図を更新します（そのぶん少し待ちが出ます）')
-    .setWrapText(true)
-    .setSwitchControl(CardService.newSwitch()
-      .setFieldName('preview')
-      .setValue('on')
-      .setSelected(live)
-      .setOnChangeAction(onChangeAction)));
-  if (!live) return section;
+/** プレビュー（常に表示。設定を変えるたびに描き直す） */
+function buildDisplaySection_(s) {
+  const section = CardService.newCardSection().addWidget(sectionHeading_('👀 プレビュー'));
 
   let html;
   try {
@@ -460,7 +486,15 @@ function previewHtml_(s, current) {
   // 選択中の段落が読めればそれを「今」とし、読めなければ例の段落で描く
   const ex = current ||
     Object.assign({}, PREVIEW.EXAMPLE, plan.target === 'right' ? { end: 2 } : {});
-  const nowLabel = current ? '選択中の段落（今）' : '例：今の段落';
+  const nowLabel = current
+    ? (current.multiple ? '選択中の先頭の段落（今）' : '選択中の段落（今）')
+    : '例：今の段落（段落を読めないため例で表示）';
+  // 今の段落の段落間隔と1字の大きさ（以前の「現在値」通知の内容）
+  const pt = v => (v === null || v === undefined) ? '既定' : formatNumber_(v) + 'pt';
+  const nowInfo = current
+    ? '\n' + font_(PREVIEW.COLOR_NOTE, '段落前 ' + pt(current.before) + '・段落後 ' + pt(current.after) +
+        '（1字=' + formatNumber_(current.em) + 'pt）')
+    : '';
   const blocks = [];
   let fractional = false;
   const fig = (title, st) => {
@@ -471,7 +505,7 @@ function previewHtml_(s, current) {
   switch (plan.mode) {
     case 'move': {
       const isRight = plan.target === 'right';
-      blocks.push(fig(nowLabel, ex));
+      blocks.push(fig(nowLabel, ex) + nowInfo);
       blocks.push(fig(isRight ? '◀ 右端を左へ' : '◀ 左へ', computeMove_(ex, plan.target, -plan.chars)));
       blocks.push(fig(isRight ? '右端を右へ ▶' : '右へ ▶', computeMove_(ex, plan.target, plan.chars)));
       break;
@@ -482,14 +516,16 @@ function previewHtml_(s, current) {
       if (plan.target === 'first')     after.first = plan.chars;
       if (plan.target === 'following') after.start = plan.chars;
       if (plan.target === 'right')     after.end = plan.chars;
-      if (plan.target !== 'all') blocks.push(fig(nowLabel, ex));
+      blocks.push(fig(nowLabel, ex) + nowInfo); // 現在の位置も並べて、変化が分かるようにする
       blocks.push(fig('設定後', after));
       break;
     }
     case 'reset':
+      blocks.push(fig(nowLabel, ex) + nowInfo);
       blocks.push(fig('解除後', { first: 0, start: 0, end: 0 }));
       break;
     default:
+      if (current) blocks.push(fig(nowLabel, ex) + nowInfo);
       blocks.push(font_(PREVIEW.COLOR_NOTE, 'インデントは変わりません。'));
   }
   if (fractional) blocks.push(font_(PREVIEW.COLOR_NOTE, '※図では0.5字を四捨五入しています'));
@@ -565,8 +601,8 @@ function buildPlan_(s, direction) {
       let first = n;
       let start = n;
       if (s.shape !== 'flush') {
-        const label = s.shape === 'indent' ? '字下げ量' : 'ぶら下げ量';
-        const m = parseChars_(s.shape_amount, label, false);
+        const label = s.shape === 'indent' ? '字下げ' : 'ぶら下げ';
+        const m = SHAPE_CHARS;
         const diff = s.shape === 'indent' ? m : -m; // 1行目 − 2行目以降
         if (s.shape_base === 'first') { first = n; start = n - diff; }
         else                          { start = n; first = n + diff; }
@@ -574,7 +610,7 @@ function buildPlan_(s, direction) {
           const line = first < 0 ? '1行目' : '2行目以降';
           throw userError_(label + '（' + formatNumber_(m) + '字）が文字数（' + formatNumber_(n) +
             '字）より大きいため、' + line + 'が左端より左に出てしまいます。文字数を' +
-            formatNumber_(m) + '字以上にするか、「位置の基準」を変えてください。');
+            formatNumber_(m) + '字以上にするか、基準を変えてください。');
         }
       }
       plan.firstChars = first;

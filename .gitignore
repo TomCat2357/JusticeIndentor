@@ -1,0 +1,8 @@
+# clasp（スクリプトIDを含むため公開しない）
+.clasp.json
+.clasprc.json
+
+# Claude Code のローカル設定
+.claude/settings.local.json
+
+node_modules/

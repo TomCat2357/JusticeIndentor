@@ -288,10 +288,11 @@ function buildCard_(s) {
   const actions = CardService.newCardSection();
   const runButtons = CardService.newButtonSet();
   if (s.mode === 'move') {
-    const isRight = s.move_target === 'right';
+    // 対象はプルダウンで、プレビュー非表示中は選んでも描き直さないため、
+    // ボタン名は対象によらない形にする（古い名前が残らないように）
     runButtons
-      .addButton(filledButton_(isRight ? '◀ 右端' : '◀', run({ direction: 'left' })))
-      .addButton(filledButton_(isRight ? '右端 ▶' : '▶', run({ direction: 'right' })));
+      .addButton(filledButton_('◀', run({ direction: 'left' })))
+      .addButton(filledButton_('▶', run({ direction: 'right' })));
   } else {
     const label = { set: '✔️ 設定', reset: '↩️ 解除', none: '✨ 整形' }[s.mode];
     runButtons.addButton(filledButton_(label, run()));
@@ -312,27 +313,27 @@ function buildCard_(s) {
   // 区切りの考え方：
   //   大きな区切り（インデント／整形／プレビュー）＝欄の境目（端から端までの線＋見出し）
   //   小さな区切り（どれか1つを選ぶボタンのまとまりごと）＝欄の中の細い線
+  // 選択肢の形：
+  //   ボタン＝選ぶと出てくる項目が変わるもの（操作・対象（左端から）・1行目の形・段落間隔）。押すと描き直す
+  //   プルダウン＝選んでも項目が変わらないもの。プレビュー非表示中は選んでもパネルを更新しない
   indent.addWidget(CardService.newDivider());
 
   switch (s.mode) {
     case 'move':
-      indent.addWidget(rowLabel_('🎯 対象'));
-      indent.addWidget(choices('move_target'));
-      indent.addWidget(numberDropdown_('move_amount', '🔢 文字数', s.move_amount, liveChange()));
+      indent.addWidget(dropdown_('move_target', '🎯 対象', s.move_target, liveChange()));
+      indent.addWidget(dropdown_('move_amount', '🔢 文字数', s.move_amount, liveChange()));
       break;
 
     case 'set':
       indent.addWidget(rowLabel_('🎯 対象'));
       indent.addWidget(choices('set_target'));
-      indent.addWidget(numberDropdown_('position', positionTitle_(s), s.position, liveChange()));
+      indent.addWidget(dropdown_('position', positionTitle_(s), s.position, liveChange()));
       if (s.set_target === 'all') {
         indent.addWidget(CardService.newDivider());
         indent.addWidget(rowLabel_('📐 1行目の形'));
         indent.addWidget(choices('shape'));
         if (s.shape !== 'flush') {
-          indent.addWidget(CardService.newDivider());
-          indent.addWidget(rowLabel_('📍 位置の基準'));
-          indent.addWidget(choices('shape_base'));
+          indent.addWidget(dropdown_('shape_base', '📍 位置の基準', s.shape_base, liveChange()));
         }
       }
       break;
@@ -348,8 +349,7 @@ function buildCard_(s) {
 
   // ---- 整形（インデント操作と同時に実行） ----
   const format = CardService.newCardSection().addWidget(sectionHeading_('🧽 整形'));
-  format.addWidget(rowLabel_('␣ 空白の削除'));
-  format.addWidget(choices('space_chars'));
+  format.addWidget(dropdown_('space_chars', '␣ 空白の削除', s.space_chars, liveChange()));
   format.addWidget(CardService.newDivider()); // 空白の削除 ／ 段落の前後の間隔 の区切り
   format.addWidget(rowLabel_('↕️ 段落の前後の間隔'));
   format.addWidget(choices('para_spacing'));
@@ -394,8 +394,11 @@ function choiceRow_(field, current, rendered, labelOverrides) {
   return row;
 }
 
-/** 文字数のドロップダウン（プレビュー表示中は、変えると図を描き直す） */
-function numberDropdown_(field, title, current, onChangeAction) {
+/**
+ * プルダウン（選択肢の文字はボタンと同じアイコン＋短い言葉）。
+ * プレビュー表示中だけ、変えると図を描き直す。
+ */
+function dropdown_(field, title, current, onChangeAction) {
   const w = CardService.newSelectionInput()
     .setFieldName(field)
     .setTitle(title)
@@ -426,7 +429,7 @@ function buildHelpSection_() {
   const usage =
     '<b>使い方</b>\n' +
     '① 段落を選択（カーソルを置くだけなら、その段落が対象）\n' +
-    '② 操作・対象などをボタンで選び、文字数を入力\n' +
+    '② 操作・対象などをボタンやプルダウンで選ぶ\n' +
     '③ 一番上の実行ボタンを押す\n' +
     '・文字数は 0.5〜5 字から選びます。\n' +
     '・1文字＝段落の先頭文字の文字サイズです。\n' +

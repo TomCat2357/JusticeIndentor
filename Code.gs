@@ -158,7 +158,12 @@ function runAction(e) {
     const ctx = createContext_(doc);
     paragraphs.forEach(p => applyToParagraph_(p, plan, ctx));
 
-    return notify_(summarize_(plan, paragraphs.length, ctx));
+    const res = CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText(summarize_(plan, paragraphs.length, ctx)));
+    // プレビュー表示中だけ、図の「今」を実行後の段落に合わせて描き直す
+    // （非表示中はパネルを更新しない）
+    if (previewShown_(s)) res.setNavigation(CardService.newNavigation().updateCard(buildCard_(s)));
+    return res.build();
   } catch (err) {
     return handleException_(err);
   }

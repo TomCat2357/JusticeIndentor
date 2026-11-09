@@ -37,7 +37,7 @@ const FIELDS = {
       { key: 'right',     text: '➡️ 右端' },
     ],
   },
-  position: { default: '0', dropdown: true, options: [{ key: '0', text: '0字' }, { key: '0.5', text: '0.5字' }, { key: '1', text: '1字' }, { key: '2', text: '2字' }, { key: '3', text: '3字' }, { key: '4', text: '4字' }, { key: '5', text: '5字' }] },
+  position: { default: '0', dropdown: true, options: [{ key: '0', text: '0字' }, { key: '1', text: '1字' }, { key: '2', text: '2字' }, { key: '3', text: '3字' }, { key: '4', text: '4字' }, { key: '5', text: '5字' }] },
   shape: {
     default: 'flush',
     options: [
@@ -475,7 +475,7 @@ function buildHelpSection_(s, rendered) {
     '① 段落を選択（カーソルを置くだけなら、その段落が対象）\n' +
     (classic ? '② 操作・対象などをボタンで選ぶ\n' : '② 操作・対象などをボタンやラジオボタンで選ぶ\n') +
     '③ 一番上の実行ボタンを押す\n' +
-    '・文字数は 0.5〜5字から選びます（位置指定は 0字も可）。\n' +
+    '・文字数は、移動は 0.5〜5字、位置指定は 0〜5字（整数）から選びます。\n' +
     '・1字＝段落の先頭の文字の大きさです。\n' +
     '・字下げ・ぶら下げの量は1字です。\n' +
     (classic ? '' : '・👀 プレビューはボタンで表示／非表示を切り替えます（非表示のほうが操作が軽くなります）。\n') +

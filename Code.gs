@@ -288,7 +288,7 @@ function buildCard_(s) {
   const actions = CardService.newCardSection();
   const runButtons = CardService.newButtonSet();
   if (s.mode === 'move') {
-    // 対象はプルダウンで、プレビュー非表示中は選んでも描き直さないため、
+    // 対象はラジオボタンで、プレビュー非表示中は選んでも描き直さないため、
     // ボタン名は対象によらない形にする（古い名前が残らないように）
     runButtons
       .addButton(filledButton_('◀', run({ direction: 'left' })))
@@ -315,12 +315,13 @@ function buildCard_(s) {
   //   小さな区切り（どれか1つを選ぶボタンのまとまりごと）＝欄の中の細い線
   // 選択肢の形：
   //   ボタン＝選ぶと出てくる項目が変わるもの（操作・対象（左端から）・1行目の形・段落間隔）。押すと描き直す
-  //   プルダウン＝選んでも項目が変わらないもの。プレビュー非表示中は選んでもパネルを更新しない
+  //   ラジオボタン＝選んでも項目が変わらないもの。プレビュー非表示中は選んでもパネルを更新しない
+  //   プルダウン＝文字数（選択肢が多く、縦に並べると長くなるため）
   indent.addWidget(CardService.newDivider());
 
   switch (s.mode) {
     case 'move':
-      indent.addWidget(dropdown_('move_target', '🎯 対象', s.move_target, liveChange()));
+      indent.addWidget(radio_('move_target', '🎯 対象', s.move_target, liveChange()));
       indent.addWidget(dropdown_('move_amount', '🔢 文字数', s.move_amount, liveChange()));
       break;
 
@@ -333,7 +334,7 @@ function buildCard_(s) {
         indent.addWidget(rowLabel_('📐 1行目の形'));
         indent.addWidget(choices('shape'));
         if (s.shape !== 'flush') {
-          indent.addWidget(dropdown_('shape_base', '📍 位置の基準', s.shape_base, liveChange()));
+          indent.addWidget(radio_('shape_base', '📍 位置の基準', s.shape_base, liveChange()));
         }
       }
       break;
@@ -349,7 +350,7 @@ function buildCard_(s) {
 
   // ---- 整形（インデント操作と同時に実行） ----
   const format = CardService.newCardSection().addWidget(sectionHeading_('🧽 整形'));
-  format.addWidget(dropdown_('space_chars', '␣ 空白の削除', s.space_chars, liveChange()));
+  format.addWidget(radio_('space_chars', '␣ 空白の削除', s.space_chars, liveChange()));
   format.addWidget(CardService.newDivider()); // 空白の削除 ／ 段落の前後の間隔 の区切り
   format.addWidget(rowLabel_('↕️ 段落の前後の間隔'));
   format.addWidget(choices('para_spacing'));
@@ -395,14 +396,22 @@ function choiceRow_(field, current, rendered, labelOverrides) {
 }
 
 /**
- * プルダウン（選択肢の文字はボタンと同じアイコン＋短い言葉）。
+ * プルダウン／ラジオボタン（選択肢の文字はボタンと同じアイコン＋短い言葉）。
  * プレビュー表示中だけ、変えると図を描き直す。
  */
 function dropdown_(field, title, current, onChangeAction) {
+  return selectionInput_(field, title, current, onChangeAction, CardService.SelectionInputType.DROPDOWN);
+}
+
+function radio_(field, title, current, onChangeAction) {
+  return selectionInput_(field, title, current, onChangeAction, CardService.SelectionInputType.RADIO_BUTTON);
+}
+
+function selectionInput_(field, title, current, onChangeAction, type) {
   const w = CardService.newSelectionInput()
     .setFieldName(field)
     .setTitle(title)
-    .setType(CardService.SelectionInputType.DROPDOWN);
+    .setType(type);
   if (onChangeAction) w.setOnChangeAction(onChangeAction);
   FIELDS[field].options.forEach(o => w.addItem(o.text, o.key, o.key === current));
   return w;
@@ -429,7 +438,7 @@ function buildHelpSection_() {
   const usage =
     '<b>使い方</b>\n' +
     '① 段落を選択（カーソルを置くだけなら、その段落が対象）\n' +
-    '② 操作・対象などをボタンやプルダウンで選ぶ\n' +
+    '② 操作・対象などをボタンやラジオボタンで選ぶ\n' +
     '③ 一番上の実行ボタンを押す\n' +
     '・文字数は 0.5〜5 字から選びます。\n' +
     '・1文字＝段落の先頭文字の文字サイズです。\n' +

@@ -73,6 +73,7 @@ const FIELDS = {
   },
   spacing_before: { default: '' },
   spacing_after:  { default: '' },
+  preview:        { default: '' }, // 'on' のときプレビューを表示（ボタンで入り切り）
 };
 
 const SHAPE_CHARS = 1; // 字下げ・ぶら下げの量（文字）
@@ -156,15 +157,25 @@ function runAction(e) {
 /**
  * 🔄 現在値：選択中の段落を読み直してプレビューを描き直す。
  * 通知（下に出る黒い帯）はパネルを隠すので出さず、値はプレビューに表示する。
+ * （値はプレビューに出すので、プレビューが切れていたら入れる）
  */
 function refreshCurrent(e) {
   try {
     const s = resolveSettings_(e);
+    s.preview = 'on';
     saveSettings_(s);
     return rerender_(s);
   } catch (err) {
     return handleException_(err);
   }
+}
+
+/** 👀 プレビューの表示／非表示を切り替える */
+function togglePreview(e) {
+  const s = resolveSettings_(e);
+  s.preview = s.preview === 'on' ? '' : 'on';
+  saveSettings_(s);
+  return rerender_(s);
 }
 
 /**
@@ -267,6 +278,9 @@ function buildCard_(s) {
     .setFunctionName('runAction')
     .setParameters(Object.assign({ rendered: rendered }, params || {}));
   const choices = (field, labelOverrides) => choiceRow_(field, s[field], rendered, labelOverrides);
+  // プレビュー表示中だけ、文字数や pt の入力を変えたときに図を描き直す
+  // （非表示のときは描き直さない＝入力のたびに画面が切り替わらない。値は実行時に読み取る）
+  const liveChange = () => (s.preview === 'on' ? onChange() : null);
 
   const card = CardService.newCardBuilder();
 
@@ -304,13 +318,13 @@ function buildCard_(s) {
     case 'move':
       indent.addWidget(rowLabel_('🎯 対象'));
       indent.addWidget(choices('move_target'));
-      indent.addWidget(numberDropdown_('move_amount', '🔢 文字数', s.move_amount, onChange()));
+      indent.addWidget(numberDropdown_('move_amount', '🔢 文字数', s.move_amount, liveChange()));
       break;
 
     case 'set':
       indent.addWidget(rowLabel_('🎯 対象'));
       indent.addWidget(choices('set_target'));
-      indent.addWidget(numberDropdown_('position', positionTitle_(s), s.position, onChange()));
+      indent.addWidget(numberDropdown_('position', positionTitle_(s), s.position, liveChange()));
       if (s.set_target === 'all') {
         indent.addWidget(CardService.newDivider());
         indent.addWidget(rowLabel_('📐 1行目の形'));
@@ -341,16 +355,16 @@ function buildCard_(s) {
   format.addWidget(choices('para_spacing'));
   if (s.para_spacing === 'custom') {
     format.addWidget(textInput_('spacing_before', '⬆️ 段落前 pt', s.spacing_before,
-      '空欄＝そのまま', onChange()));
+      '空欄＝そのまま', liveChange()));
     format.addWidget(textInput_('spacing_after',  '⬇️ 段落後 pt', s.spacing_after,
-      '空欄＝そのまま', onChange()));
+      '空欄＝そのまま', liveChange()));
   }
 
   // 並び順：実行ボタンを一番上に
   card.addSection(actions);
   card.addSection(indent);
   card.addSection(format);
-  card.addSection(buildDisplaySection_(s));
+  card.addSection(buildDisplaySection_(s, rendered));
   card.addSection(buildHelpSection_());
 
   return card.build();
@@ -380,13 +394,13 @@ function choiceRow_(field, current, rendered, labelOverrides) {
   return row;
 }
 
-/** 文字数のドロップダウン（変えるとプレビューを描き直す） */
+/** 文字数のドロップダウン（プレビュー表示中は、変えると図を描き直す） */
 function numberDropdown_(field, title, current, onChangeAction) {
   const w = CardService.newSelectionInput()
     .setFieldName(field)
     .setTitle(title)
-    .setType(CardService.SelectionInputType.DROPDOWN)
-    .setOnChangeAction(onChangeAction);
+    .setType(CardService.SelectionInputType.DROPDOWN);
+  if (onChangeAction) w.setOnChangeAction(onChangeAction);
   FIELDS[field].options.forEach(o => w.addItem(o.text, o.key, o.key === current));
   return w;
 }
@@ -417,6 +431,7 @@ function buildHelpSection_() {
     '・文字数は 0.5〜5 字から選びます。\n' +
     '・1文字＝段落の先頭文字の文字サイズです。\n' +
     '・字下げ・ぶら下げの量は1文字です。\n' +
+    '・👀 プレビューはボタンで表示／非表示を切り替えます（非表示のほうが操作が軽くなります）。\n' +
     '・設定内容は次回開いたときも引き継がれます。';
   const notes =
     '<b>注意</b>\n' +
@@ -466,9 +481,19 @@ const PREVIEW = {
   COLOR_ERROR: '#d93025',
 };
 
-/** プレビュー（常に表示。設定を変えるたびに描き直す） */
-function buildDisplaySection_(s) {
+/**
+ * プレビュー（ボタンで表示／非表示）。
+ * 表示中だけ選択中の段落を読んで図を描く（非表示なら文書を読まないので軽い）。
+ */
+function buildDisplaySection_(s, rendered) {
+  const live = s.preview === 'on';
   const section = CardService.newCardSection().addWidget(sectionHeading_('👀 プレビュー'));
+  section.addWidget(CardService.newButtonSet().addButton(CardService.newTextButton()
+    .setText(live ? '🙈 隠す' : '👀 表示')
+    .setOnClickAction(CardService.newAction()
+      .setFunctionName('togglePreview')
+      .setParameters({ rendered: rendered }))));
+  if (!live) return section;
 
   let html;
   try {

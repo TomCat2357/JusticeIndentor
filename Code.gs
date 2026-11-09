@@ -524,6 +524,7 @@ function filledButton_(text, action) {
 
 const PREVIEW = {
   WIDTH: 16,                                // 図の1行の幅（文字）
+  MIN_TEXT: 6,                              // 本文（■）をこれ以上細くしないよう、余白の途中を省く（文字）
   EXAMPLE: { first: 2, start: 2, end: 0 },  // 「今の段落」の例
   SAMPLE_TEXT: '　①　ああ　いい ',          // 空白処理の例文
   COLOR_TEXT: '#8d6e63',
@@ -578,15 +579,21 @@ function previewHtml_(s, current) {
     : '';
   const blocks = [];
   let fractional = false;
+  // 図は全部の段落がそろってから描く（省略〜の幅を図どうしでそろえ、動きの差が見えるように）
+  const states = [];
+  let cut = null;
   const fig = (title, st) => {
     if ([st.first, st.start, st.end].some(v => v % 1 !== 0)) fractional = true;
-    return '<b>' + title + '</b>\n' + drawParagraph_(st) + '\n' + font_(PREVIEW.COLOR_NOTE, describe_(st));
+    states.push(st);
+    return () => '<b>' + title + '</b>\n' + drawParagraph_(st, cutFor_(st, cut)) + '\n' +
+      font_(PREVIEW.COLOR_NOTE, describe_(st));
   };
+  const withInfo = (draw, info) => () => draw() + info;
 
   switch (plan.mode) {
     case 'move': {
       const isRight = plan.target === 'right';
-      blocks.push(fig(nowLabel, ex) + nowInfo);
+      blocks.push(withInfo(fig(nowLabel, ex), nowInfo));
       blocks.push(fig(isRight ? '◀ 右端を左へ' : '◀ 左へ', computeMove_(ex, plan.target, -plan.chars)));
       blocks.push(fig(isRight ? '右端を右へ ▶' : '右へ ▶', computeMove_(ex, plan.target, plan.chars)));
       break;
@@ -597,19 +604,28 @@ function previewHtml_(s, current) {
       if (plan.target === 'first')     after.first = plan.chars;
       if (plan.target === 'following') after.start = plan.chars;
       if (plan.target === 'right')     after.end = plan.chars;
-      blocks.push(fig(nowLabel, ex) + nowInfo); // 現在の位置も並べて、変化が分かるようにする
+      blocks.push(withInfo(fig(nowLabel, ex), nowInfo)); // 現在の位置も並べて、変化が分かるようにする
       blocks.push(fig('設定後', after));
       break;
     }
     case 'reset':
-      blocks.push(fig(nowLabel, ex) + nowInfo);
+      blocks.push(withInfo(fig(nowLabel, ex), nowInfo));
       blocks.push(fig('解除後', { first: 0, start: 0, end: 0 }));
       break;
     default:
-      if (current) blocks.push(fig(nowLabel, ex) + nowInfo);
+      if (current) blocks.push(withInfo(fig(nowLabel, ex), nowInfo));
       blocks.push(font_(PREVIEW.COLOR_NOTE, 'インデントは変わりません。'));
   }
-  if (fractional) blocks.push(font_(PREVIEW.COLOR_NOTE, '※図では0.5字を四捨五入しています'));
+  cut = previewCut_(states);
+  for (let i = 0; i < blocks.length; i++) {
+    if (typeof blocks[i] === 'function') blocks[i] = blocks[i]();
+  }
+  const notes = [];
+  if (states.some(st => { const k = cutFor_(st, cut); return k.left || k.right; })) {
+    notes.push('〜は途中を省略しています');
+  }
+  if (fractional) notes.push('0.5字は四捨五入しています');
+  if (notes.length) blocks.push(font_(PREVIEW.COLOR_NOTE, '※図では' + notes.join('。') + '。'));
 
   if (plan.spaceChars !== 'none') {
     let str = PREVIEW.SAMPLE_TEXT;
@@ -628,16 +644,52 @@ function previewHtml_(s, current) {
   return blocks.join('\n\n');
 }
 
-/** 段落の図：1行目と2行目以降の2行。・＝インデント、■＝本文 */
-function drawParagraph_(st) {
+/**
+ * インデントが大きくて本文（■）が細くなりすぎるときに、余白の途中を省く量（字）。
+ * 並べて描く図すべてで同じ量を省く（図どうしの差＝動きがそのまま見えるように）。
+ * 1行目と2行目以降に共通の余白だけを省くので、2行の位置関係は崩れない。
+ * 省いたところは「・〜」で示し、省いても余白は2字以上残す。
+ */
+function previewCut_(states) {
+  const r = v => Math.max(0, Math.round(v));
+  let need = 0;
+  let maxLeftCut = Infinity;
+  let maxRightCut = Infinity;
+  states.forEach(st => {
+    need = Math.max(need, Math.max(r(st.first), r(st.start)) + r(st.end) + PREVIEW.MIN_TEXT - PREVIEW.WIDTH);
+    maxLeftCut = Math.min(maxLeftCut, Math.min(r(st.first), r(st.start)) - 2);
+    maxRightCut = Math.min(maxRightCut, r(st.end) - 2);
+  });
+  const left = Math.max(0, Math.min(need, maxLeftCut));      // まず左の余白を省き
+  const right = Math.max(0, Math.min(need - left, maxRightCut)); // 足りなければ右の余白も省く
+  return { left: left, right: right };
+}
+
+/**
+ * その図で使う省略量：ふだんは図どうしでそろえた量。
+ * それでは本文が細くなりすぎる図（例：解除後が0字で、そろえて省けない「今」）だけ、その図単独で省く。
+ */
+function cutFor_(st, shared) {
+  const r = v => Math.max(0, Math.round(v));
+  const text = PREVIEW.WIDTH - (Math.max(r(st.first), r(st.start)) - shared.left) - (r(st.end) - shared.right);
+  return text >= PREVIEW.MIN_TEXT / 2 ? shared : previewCut_([st]);
+}
+
+/** 段落の図：1行目と2行目以降の2行。・＝インデント、■＝本文、〜＝省略 */
+function drawParagraph_(st, cut) {
   const W = PREVIEW.WIDTH;
-  const right = Math.min(Math.round(st.end), W - 1);
+  const cutL = (cut && cut.left) || 0;
+  const cutR = (cut && cut.right) || 0;
+  const dots = n => font_(PREVIEW.COLOR_SPACE, '・'.repeat(Math.max(0, n)));
+  const mark = font_(PREVIEW.COLOR_NOTE, '〜');
+  // 右の余白（省くときは「・・〜・」のように、端の1字の手前に〜）
+  const right = Math.min(Math.max(0, Math.round(st.end)) - cutR, W - 1);
+  const rightHtml = cutR ? dots(right - 2) + mark + dots(1) : dots(right);
   const line = left => {
-    const l = Math.min(Math.round(left), W - right - 1);
-    return '｜' +
-      font_(PREVIEW.COLOR_SPACE, '・'.repeat(Math.max(0, l))) +
-      font_(PREVIEW.COLOR_TEXT, '■'.repeat(W - Math.max(0, l) - right)) +
-      font_(PREVIEW.COLOR_SPACE, '・'.repeat(right)) + '｜';
+    // 左の余白（省くときは「・〜・・」のように、端の1字の後ろに〜）
+    const l = Math.max(0, Math.min(Math.max(0, Math.round(left)) - cutL, W - right - 1));
+    const leftHtml = cutL ? dots(1) + mark + dots(l - 2) : dots(l);
+    return '｜' + leftHtml + font_(PREVIEW.COLOR_TEXT, '■'.repeat(W - l - right)) + rightHtml + '｜';
   };
   return line(st.first) + '\n' + line(st.start);
 }

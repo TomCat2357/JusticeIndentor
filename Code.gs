@@ -73,7 +73,17 @@ const FIELDS = {
   },
   spacing_before: { default: '' },
   spacing_after:  { default: '' },
-  preview:        { default: '' }, // 'on' のときプレビューを表示（ボタンで入り切り）
+  preview:        { default: '' }, // 'on' のときプレビューを表示（ボタンで入り切り。ui が light のとき）
+  // 画面の動き（ヘルプ欄で切り替え）
+  //   light：プレビューはボタンで入り切り。非表示中は更新を最小限に（項目が変わらない選択肢はラジオボタン）
+  //   live ：プレビューを常に表示し、設定を変えるたびに描き直す（選択肢はすべてボタン）
+  ui: {
+    default: 'light',
+    options: [
+      { key: 'light', text: '🪶 軽快' },
+      { key: 'live',  text: '👀 常時プレビュー' },
+    ],
+  },
 };
 
 const SHAPE_CHARS = 1; // 字下げ・ぶら下げの量（文字）
@@ -162,12 +172,22 @@ function runAction(e) {
 function refreshCurrent(e) {
   try {
     const s = resolveSettings_(e);
-    s.preview = 'on';
+    if (!alwaysPreview_(s)) s.preview = 'on';
     saveSettings_(s);
     return rerender_(s);
   } catch (err) {
     return handleException_(err);
   }
+}
+
+/** 「👀 常時プレビュー」の画面か */
+function alwaysPreview_(s) {
+  return s.ui === 'live';
+}
+
+/** プレビューを描くか（常時プレビュー、または 👀 表示 中） */
+function previewShown_(s) {
+  return alwaysPreview_(s) || s.preview === 'on';
 }
 
 /** 👀 プレビューの表示／非表示を切り替える */
@@ -280,7 +300,13 @@ function buildCard_(s) {
   const choices = (field, labelOverrides) => choiceRow_(field, s[field], rendered, labelOverrides);
   // プレビュー表示中だけ、文字数や pt の入力を変えたときに図を描き直す
   // （非表示のときは描き直さない＝入力のたびに画面が切り替わらない。値は実行時に読み取る）
-  const liveChange = () => (s.preview === 'on' ? onChange() : null);
+  const liveChange = () => (previewShown_(s) ? onChange() : null);
+  // 項目が変わらない選択肢：🪶 軽快 ではラジオボタン、👀 常時プレビュー ではボタン
+  const classic = alwaysPreview_(s);
+  const pick = (section, field, title) => {
+    if (classic) section.addWidget(rowLabel_(title)).addWidget(choices(field));
+    else section.addWidget(radio_(field, title, s[field], liveChange()));
+  };
 
   const card = CardService.newCardBuilder();
 
@@ -288,11 +314,12 @@ function buildCard_(s) {
   const actions = CardService.newCardSection();
   const runButtons = CardService.newButtonSet();
   if (s.mode === 'move') {
-    // 対象はラジオボタンで、プレビュー非表示中は選んでも描き直さないため、
+    // 🪶 軽快 では対象を選んでも描き直さないことがあるため、
     // ボタン名は対象によらない形にする（古い名前が残らないように）
+    const isRight = classic && s.move_target === 'right';
     runButtons
-      .addButton(filledButton_('◀', run({ direction: 'left' })))
-      .addButton(filledButton_('▶', run({ direction: 'right' })));
+      .addButton(filledButton_(isRight ? '◀ 右端' : '◀', run({ direction: 'left' })))
+      .addButton(filledButton_(isRight ? '右端 ▶' : '▶', run({ direction: 'right' })));
   } else {
     const label = { set: '✔️ 設定', reset: '↩️ 解除', none: '✨ 整形' }[s.mode];
     runButtons.addButton(filledButton_(label, run()));
@@ -316,12 +343,13 @@ function buildCard_(s) {
   // 選択肢の形：
   //   ボタン＝選ぶと出てくる項目が変わるもの（操作・対象（左端から）・1行目の形・段落間隔）。押すと描き直す
   //   ラジオボタン＝選んでも項目が変わらないもの。プレビュー非表示中は選んでもパネルを更新しない
+  //                 （👀 常時プレビュー ではこれもボタン）
   //   プルダウン＝文字数（選択肢が多く、縦に並べると長くなるため）
   indent.addWidget(CardService.newDivider());
 
   switch (s.mode) {
     case 'move':
-      indent.addWidget(radio_('move_target', '🎯 対象', s.move_target, liveChange()));
+      pick(indent, 'move_target', '🎯 対象');
       indent.addWidget(dropdown_('move_amount', '🔢 文字数', s.move_amount, liveChange()));
       break;
 
@@ -334,7 +362,8 @@ function buildCard_(s) {
         indent.addWidget(rowLabel_('📐 1行目の形'));
         indent.addWidget(choices('shape'));
         if (s.shape !== 'flush') {
-          indent.addWidget(radio_('shape_base', '📍 位置の基準', s.shape_base, liveChange()));
+          if (classic) indent.addWidget(CardService.newDivider());
+          pick(indent, 'shape_base', '📍 位置の基準');
         }
       }
       break;
@@ -350,7 +379,7 @@ function buildCard_(s) {
 
   // ---- 整形（インデント操作と同時に実行） ----
   const format = CardService.newCardSection().addWidget(sectionHeading_('🧽 整形'));
-  format.addWidget(radio_('space_chars', '␣ 空白の削除', s.space_chars, liveChange()));
+  pick(format, 'space_chars', '␣ 空白の削除');
   format.addWidget(CardService.newDivider()); // 空白の削除 ／ 段落の前後の間隔 の区切り
   format.addWidget(rowLabel_('↕️ 段落の前後の間隔'));
   format.addWidget(choices('para_spacing'));
@@ -366,7 +395,7 @@ function buildCard_(s) {
   card.addSection(indent);
   card.addSection(format);
   card.addSection(buildDisplaySection_(s, rendered));
-  card.addSection(buildHelpSection_());
+  card.addSection(buildHelpSection_(s, rendered));
 
   return card.build();
 }
@@ -434,16 +463,21 @@ function rowLabel_(text) {
   return CardService.newTextParagraph().setText('<font color="#5f6368">' + text + '</font>');
 }
 
-function buildHelpSection_() {
+/** 一番下の折りたたみ欄：画面の動きの切り替え＋ヘルプ・注意事項 */
+function buildHelpSection_(s, rendered) {
+  const classic = alwaysPreview_(s);
+  const uiNote = font_(PREVIEW.COLOR_NOTE,
+    '🪶 軽快：プレビューはボタンで入り切り。非表示中は更新が少なく軽い\n' +
+    '👀 常時プレビュー：設定を変えるたびに図を描き直す');
   const usage =
     '<b>使い方</b>\n' +
     '① 段落を選択（カーソルを置くだけなら、その段落が対象）\n' +
-    '② 操作・対象などをボタンやラジオボタンで選ぶ\n' +
+    (classic ? '② 操作・対象などをボタンで選ぶ\n' : '② 操作・対象などをボタンやラジオボタンで選ぶ\n') +
     '③ 一番上の実行ボタンを押す\n' +
     '・文字数は 0.5〜5 字から選びます。\n' +
     '・1文字＝段落の先頭文字の文字サイズです。\n' +
     '・字下げ・ぶら下げの量は1文字です。\n' +
-    '・👀 プレビューはボタンで表示／非表示を切り替えます（非表示のほうが操作が軽くなります）。\n' +
+    (classic ? '' : '・👀 プレビューはボタンで表示／非表示を切り替えます（非表示のほうが操作が軽くなります）。\n') +
     '・設定内容は次回開いたときも引き継がれます。';
   const notes =
     '<b>注意</b>\n' +
@@ -451,9 +485,13 @@ function buildHelpSection_() {
     '・メイリオ等のプロポーショナルフォントでは、文字数ぴったりにならない場合があります。\n' +
     '・提案モードには対応していません（スクリプトの編集は常に直接編集になります）。提案は承認／拒否してからお使いください。';
   return CardService.newCardSection()
-    .setHeader('ヘルプ・注意事項')
+    .setHeader('⚙️ 画面の動き・ヘルプ・注意事項')
     .setCollapsible(true)
     .setNumUncollapsibleWidgets(0)
+    .addWidget(rowLabel_('⚙️ 画面の動き'))
+    .addWidget(choiceRow_('ui', s.ui, rendered))
+    .addWidget(CardService.newTextParagraph().setText(uiNote))
+    .addWidget(CardService.newDivider())
     .addWidget(CardService.newTextParagraph().setText(usage))
     .addWidget(CardService.newTextParagraph().setText(notes));
 }
@@ -494,19 +532,24 @@ const PREVIEW = {
 };
 
 /**
- * プレビュー（ボタンで表示／非表示）。
+ * プレビュー（🪶 軽快 ではボタンで表示／非表示、👀 常時プレビュー では常に表示）。
  * 表示中だけ選択中の段落を読んで図を描く（非表示なら文書を読まないので軽い）。
  */
 function buildDisplaySection_(s, rendered) {
-  const live = s.preview === 'on';
   const section = CardService.newCardSection().addWidget(sectionHeading_('👀 プレビュー'));
+  if (alwaysPreview_(s)) return addPreviewFigure_(section, s); // 👀 常時プレビュー：入り切りボタンなし
+  const live = s.preview === 'on';
   section.addWidget(CardService.newButtonSet().addButton(CardService.newTextButton()
     .setText(live ? '🙈 隠す' : '👀 表示')
     .setOnClickAction(CardService.newAction()
       .setFunctionName('togglePreview')
       .setParameters({ rendered: rendered }))));
   if (!live) return section;
+  return addPreviewFigure_(section, s);
+}
 
+/** 選択中の段落を読んで図を描き、欄に足す */
+function addPreviewFigure_(section, s) {
   let html;
   try {
     html = previewHtml_(s, readCurrentState_());

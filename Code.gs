@@ -314,12 +314,10 @@ function buildCard_(s) {
   const actions = CardService.newCardSection();
   const runButtons = CardService.newButtonSet();
   if (s.mode === 'move') {
-    // 🪶 軽快 では対象を選んでも描き直さないことがあるため、
-    // ボタン名は対象によらない形にする（古い名前が残らないように）
-    const isRight = classic && s.move_target === 'right';
+    // ボタン名は対象によらず ◀ ／ ▶ だけ（対象はすぐ下の選択肢で分かる）
     runButtons
-      .addButton(filledButton_(isRight ? '◀ 右端' : '◀', run({ direction: 'left' })))
-      .addButton(filledButton_(isRight ? '右端 ▶' : '▶', run({ direction: 'right' })));
+      .addButton(filledButton_('◀', run({ direction: 'left' })))
+      .addButton(filledButton_('▶', run({ direction: 'right' })));
   } else {
     const label = { set: '✔️ 設定', reset: '↩️ 解除', none: '✨ 整形' }[s.mode];
     runButtons.addButton(filledButton_(label, run()));

@@ -12,7 +12,7 @@ const FIELDS = {
     default: 'move',
     options: [
       { key: 'move',  text: '↔️ ずらす' },
-      { key: 'set',   text: '📏 左端から' },
+      { key: 'set',   text: '📏 位置指定' },
       { key: 'reset', text: '↩️ 解除' },
       { key: 'none',  text: '✨ 整形のみ' },
     ],
@@ -49,8 +49,8 @@ const FIELDS = {
   shape_base: {
     default: 'following',
     options: [
-      { key: 'following', text: '2️⃣ を基準' },
-      { key: 'first',     text: '1️⃣ を基準' },
+      { key: 'following', text: '2️⃣ 2行目〜' },
+      { key: 'first',     text: '1️⃣ 1行目' },
     ],
   },
   space_chars: {
@@ -60,14 +60,14 @@ const FIELDS = {
       { key: 'leading', text: '⬅️ 先頭' },
       { key: 'trim',    text: '↔️ 前後' },
       { key: 'all',     text: '🧹 全部' },
-      { key: 'all_but_label', text: '①␣ 番号後は残す' },
+      { key: 'all_but_label', text: '① 番号の後は残す' },
     ],
   },
   para_spacing: {
     default: 'keep',
     options: [
       { key: 'keep',   text: '🚫 そのまま' },
-      { key: 'zero',   text: '⏬ 0に' },
+      { key: 'zero',   text: '⏬ 0pt' },
       { key: 'custom', text: '✏️ 指定' },
     ],
   },
@@ -331,15 +331,13 @@ function buildCard_(s) {
 
   // ---- インデント ----
   const indent = CardService.newCardSection().addWidget(sectionHeading_('📐 インデント'));
-  // 「左端から」で対象が右端のときは、ボタン名も「右端から」にする
   indent.addWidget(rowLabel_('🛠 操作'));
-  indent.addWidget(choices('mode',
-    (s.mode === 'set' && s.set_target === 'right') ? { set: '📏 右端から' } : null));
+  indent.addWidget(choices('mode'));
   // 区切りの考え方：
   //   大きな区切り（インデント／整形／プレビュー）＝欄の境目（端から端までの線＋見出し）
   //   小さな区切り（どれか1つを選ぶボタンのまとまりごと）＝欄の中の細い線
   // 選択肢の形：
-  //   ボタン＝選ぶと出てくる項目が変わるもの（操作・対象（左端から）・1行目の形・段落間隔）。押すと描き直す
+  //   ボタン＝選ぶと出てくる項目が変わるもの（操作・対象（位置指定）・1行目の形・段落間隔）。押すと描き直す
   //   ラジオボタン＝選んでも項目が変わらないもの。プレビュー非表示中は選んでもパネルを更新しない
   //                 （👀 常時プレビュー ではこれもボタン）
   //   プルダウン＝文字数（選択肢が多く、縦に並べると長くなるため）
@@ -361,23 +359,23 @@ function buildCard_(s) {
         indent.addWidget(choices('shape'));
         if (s.shape !== 'flush') {
           if (classic) indent.addWidget(CardService.newDivider());
-          pick(indent, 'shape_base', '📍 位置の基準');
+          pick(indent, 'shape_base', '📍 指定位置に置く行');
         }
       }
       break;
 
     case 'reset':
-      indent.addWidget(CardService.newTextParagraph().setText('↩️ 左・1行目・右 → 0'));
+      indent.addWidget(CardService.newTextParagraph().setText('↩️ 1行目・2行目〜・右端をすべて 0字に戻します'));
       break;
 
     case 'none':
-      indent.addWidget(CardService.newTextParagraph().setText('✨ 整形だけ実行'));
+      indent.addWidget(CardService.newTextParagraph().setText('✨ インデントは変えず、下の整形だけ行います'));
       break;
   }
 
   // ---- 整形（インデント操作と同時に実行） ----
   const format = CardService.newCardSection().addWidget(sectionHeading_('🧽 整形'));
-  pick(format, 'space_chars', '␣ 空白の削除');
+  pick(format, 'space_chars', '✂️ 空白の削除');
   format.addWidget(CardService.newDivider()); // 空白の削除 ／ 段落の前後の間隔 の区切り
   format.addWidget(rowLabel_('↕️ 段落の前後の間隔'));
   format.addWidget(choices('para_spacing'));
@@ -472,9 +470,9 @@ function buildHelpSection_(s, rendered) {
     '① 段落を選択（カーソルを置くだけなら、その段落が対象）\n' +
     (classic ? '② 操作・対象などをボタンで選ぶ\n' : '② 操作・対象などをボタンやラジオボタンで選ぶ\n') +
     '③ 一番上の実行ボタンを押す\n' +
-    '・文字数は 0.5〜5 字から選びます。\n' +
-    '・1文字＝段落の先頭文字の文字サイズです。\n' +
-    '・字下げ・ぶら下げの量は1文字です。\n' +
+    '・文字数は 0.5〜5字から選びます（位置指定は 0字も可）。\n' +
+    '・1字＝段落の先頭の文字の大きさです。\n' +
+    '・字下げ・ぶら下げの量は1字です。\n' +
     (classic ? '' : '・👀 プレビューはボタンで表示／非表示を切り替えます（非表示のほうが操作が軽くなります）。\n') +
     '・設定内容は次回開いたときも引き継がれます。';
   const notes =
@@ -566,12 +564,12 @@ function previewHtml_(s, current) {
     Object.assign({}, PREVIEW.EXAMPLE, plan.target === 'right' ? { end: 2 } : {});
   const nowLabel = current
     ? (current.multiple ? '選択中の先頭の段落（今）' : '選択中の段落（今）')
-    : '例：今の段落（段落を読めないため例で表示）';
+    : '例の段落（選択中の段落を読めないため）';
   // 今の段落の段落間隔と1字の大きさ（以前の「現在値」通知の内容）
   const pt = v => (v === null || v === undefined) ? '既定' : formatNumber_(v) + 'pt';
   const nowInfo = current
     ? '\n' + font_(PREVIEW.COLOR_NOTE, '段落前 ' + pt(current.before) + '・段落後 ' + pt(current.after) +
-        '（1字=' + formatNumber_(current.em) + 'pt）')
+        '（1字＝' + formatNumber_(current.em) + 'pt）')
     : '';
   const blocks = [];
   let fractional = false;
@@ -615,7 +613,7 @@ function previewHtml_(s, current) {
       deleteText: (a, b) => { str = str.slice(0, a) + str.slice(b + 1); },
     };
     handleSpaceChars_({ editAsText: () => fake }, plan.spaceChars);
-    blocks.push('<b>文字の空白</b>\n' + showSpaces_(PREVIEW.SAMPLE_TEXT) + '\n→ ' + showSpaces_(str));
+    blocks.push('<b>空白の削除</b>\n' + showSpaces_(PREVIEW.SAMPLE_TEXT) + '\n→ ' + showSpaces_(str));
   }
 
   if (plan.spacing) {
@@ -641,7 +639,7 @@ function drawParagraph_(st) {
 
 function describe_(st) {
   return '1行目 ' + formatNumber_(st.first) + '字・2行目以降 ' + formatNumber_(st.start) + '字' +
-    (st.end ? '・右 ' + formatNumber_(st.end) + '字' : '');
+    (st.end ? '・右端 ' + formatNumber_(st.end) + '字' : '');
 }
 
 /** 空白を見える記号にする（全角□・半角␣） */
@@ -686,9 +684,9 @@ function buildPlan_(s, direction) {
         else                          { start = n; first = n + diff; }
         if (first < 0 || start < 0) {
           const line = first < 0 ? '1行目' : '2行目以降';
-          throw userError_(label + '（' + formatNumber_(m) + '字）が文字数（' + formatNumber_(n) +
-            '字）より大きいため、' + line + 'が左端より左に出てしまいます。文字数を' +
-            formatNumber_(m) + '字以上にするか、基準を変えてください。');
+          throw userError_('左端から' + formatNumber_(n) + '字の位置では、' + label + '（' + formatNumber_(m) +
+            '字）で' + line + 'が左端より左に出てしまいます。左端から' + formatNumber_(m) +
+            '字以上にするか、「指定位置に置く行」を変えてください。');
         }
       }
       plan.firstChars = first;
@@ -1068,12 +1066,12 @@ function summarize_(plan, count, ctx) {
   switch (plan.mode) {
     case 'move': {
       const dir = plan.sign > 0 ? '右' : '左';
-      const what = plan.target === 'right' ? '右端を' : '';
-      msg = count + '段落の' + what + dir + 'へ' + formatNumber_(plan.chars) + '字移動しました。';
+      const what = { all: '', first: 'の1行目', following: 'の2行目以降', right: 'の右端' }[plan.target] || '';
+      msg = count + '段落' + what + 'を' + dir + 'へ' + formatNumber_(plan.chars) + '字ずらしました。';
       break;
     }
     case 'set':
-      msg = count + '段落に設定しました' + (plan.target === 'all'
+      msg = count + '段落のインデントを設定しました' + (plan.target === 'all'
         ? '（1行目 ' + formatNumber_(plan.firstChars) + '字・2行目以降 ' + formatNumber_(plan.startChars) + '字）。'
         : '。');
       break;

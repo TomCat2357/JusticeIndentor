@@ -315,7 +315,7 @@ function buildCard_(s) {
 
   const card = CardService.newCardBuilder();
 
-  // ---- 実行ボタン（一番上） ----
+  // ---- 実行ボタン（プレビューのすぐ下） ----
   const actions = CardService.newCardSection();
   const runButtons = CardService.newButtonSet();
   if (s.mode === 'move') {
@@ -391,11 +391,11 @@ function buildCard_(s) {
       '空欄＝そのまま', liveChange()));
   }
 
-  // 並び順：実行ボタンを一番上に
+  // 並び順：プレビュー → 実行ボタン → インデント → 整形 → ヘルプ（🪶 軽快／👀 常時プレビュー 共通）
+  card.addSection(buildDisplaySection_(s, rendered));
   card.addSection(actions);
   card.addSection(indent);
   card.addSection(format);
-  card.addSection(buildDisplaySection_(s, rendered));
   card.addSection(buildHelpSection_(s, rendered));
 
   return card.build();
@@ -474,7 +474,7 @@ function buildHelpSection_(s, rendered) {
     '<b>使い方</b>\n' +
     '① 段落を選択（カーソルを置くだけなら、その段落が対象）\n' +
     (classic ? '② 操作・対象などをボタンで選ぶ\n' : '② 操作・対象などをボタンやラジオボタンで選ぶ\n') +
-    '③ 一番上の実行ボタンを押す\n' +
+    '③ プレビューのすぐ下の実行ボタンを押す\n' +
     '・文字数は、移動は 0.5〜5字、位置指定は 0〜5字（整数）から選びます。\n' +
     '・1字＝段落の先頭の文字の大きさです。\n' +
     '・字下げ・ぶら下げの量は1字です。\n' +

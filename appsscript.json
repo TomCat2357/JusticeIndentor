@@ -1,7 +1,20 @@
 {
   "timeZone": "Asia/Tokyo",
-  "dependencies": {
-  },
+  "dependencies": {},
   "exceptionLogging": "STACKDRIVER",
-  "runtimeVersion": "V8"
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/documents.currentonly"
+  ],
+  "addOns": {
+    "common": {
+      "name": "Justice Indentor",
+      "logoUrl": "https://lh3.googleusercontent.com/d/1u1KgqFVRU3T7AbaTeROCneDzuJQX8noy"
+    },
+    "docs": {
+      "homepageTrigger": {
+        "runFunction": "onDocsHomepage"
+      }
+    }
+  }
 }
